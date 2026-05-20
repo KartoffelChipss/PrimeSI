@@ -4,6 +4,8 @@ on:
   push:
     branches: [ "main" ]
   workflow_dispatch:
+  schedule:
+    - cron: "0 3 * * *"
 
 jobs:
   build:
@@ -68,6 +70,12 @@ jobs:
         run: |
           echo "$DEPLOY_SSH_KEY" > key.pem
           chmod 600 key.pem
+          
+          if ssh -i key.pem $DEPLOY_USER@$DEPLOY_HOST \
+            "[ -d $TARGET_PATH/org/strassburger/primesi/$VERSION ]"; then
+            echo "Version already exists, skipping deploy"
+            exit 0
+          fi
 
           rsync -avz -e "ssh -i key.pem -o StrictHostKeyChecking=no" \
             staging/ \
