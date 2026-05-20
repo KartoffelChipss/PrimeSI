@@ -66,9 +66,9 @@ jobs:
           DEPLOY_USER: ${{ secrets.MAVEN_USER }}
           TARGET_PATH: ${{ secrets.MAVEN_PATH }}
         run: |
-          echo "DEPLOY_SSH_KEY" > key.pem
+          echo "$DEPLOY_SSH_KEY" > key.pem
           chmod 600 key.pem
 
           rsync -avz -e "ssh -i key.pem -o StrictHostKeyChecking=no" \
             staging/ \
-            DEPLOY_USER@DEPLOY_HOST:$TARGET_PATH
+            "$DEPLOY_USER@$DEPLOY_HOST:$TARGET_PATH"
