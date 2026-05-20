@@ -61,14 +61,14 @@ jobs:
       - name: Deploy to Maven repository (Nginx)
         env:
           VERSION: ${{ steps.si_version.outputs.version }}
-          SSH_KEY: ${{ secrets.MAVEN_SSH_KEY }}
-          HOST: ${{ secrets.MAVEN_HOST }}
-          USER: ${{ secrets.MAVEN_USER }}
+          DEPLOY_SSH_KEY: ${{ secrets.MAVEN_SSH_KEY }}
+          DEPLOY_HOST: ${{ secrets.MAVEN_HOST }}
+          DEPLOY_USER: ${{ secrets.MAVEN_USER }}
           TARGET_PATH: ${{ secrets.MAVEN_PATH }}
         run: |
-          echo "$SSH_KEY" > key.pem
+          echo "DEPLOY_SSH_KEY" > key.pem
           chmod 600 key.pem
 
           rsync -avz -e "ssh -i key.pem -o StrictHostKeyChecking=no" \
             staging/ \
-            $USER@$HOST:$TARGET_PATH
+            DEPLOY_USER@DEPLOY_HOST:$TARGET_PATH
