@@ -1,0 +1,74 @@
+name: Build and Deploy PrimeSI
+
+on:
+  push:
+    branches: [ "main" ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Enable Corepack (pnpm)
+        run: corepack enable
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Install latest simple-icons
+        run: pnpm add simple-icons@latest
+
+      - name: Get simple-icons version
+        id: si_version
+        run: |
+          VERSION=$(node -p "require('simple-icons/package.json').version")
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Run build
+        run: pnpm run go
+
+      - name: Verify artifact exists
+        run: ls -lah out/
+
+      - name: Prepare Maven artifact layout
+        run: |
+          VERSION=${{ steps.si_version.outputs.version }}
+
+          mkdir -p staging/org/strassburger/primesi/$VERSION
+
+          cp out/primesi.jar \
+            staging/org/strassburger/primesi/$VERSION/primesi-$VERSION.jar
+
+          cat > staging/org/strassburger/primesi/$VERSION/primesi-$VERSION.pom <<EOF
+          <project xmlns="http://maven.apache.org/POM/4.0.0">
+            <modelVersion>4.0.0</modelVersion>
+            <groupId>org.strassburger</groupId>
+            <artifactId>primesi</artifactId>
+            <version>${VERSION}</version>
+          </project>
+          EOF
+
+      - name: Deploy to Maven repository (Nginx)
+        env:
+          VERSION: ${{ steps.si_version.outputs.version }}
+          SSH_KEY: ${{ secrets.MAVEN_SSH_KEY }}
+          HOST: ${{ secrets.MAVEN_HOST }}
+          USER: ${{ secrets.MAVEN_USER }}
+          TARGET_PATH: ${{ secrets.MAVEN_PATH }}
+        run: |
+          echo "$SSH_KEY" > key.pem
+          chmod 600 key.pem
+
+          rsync -avz -e "ssh -i key.pem -o StrictHostKeyChecking=no" \
+            staging/ \
+            $USER@$HOST:$TARGET_PATH
