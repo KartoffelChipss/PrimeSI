@@ -30,7 +30,8 @@ jobs:
       - name: Get simple-icons version
         id: si_version
         run: |
-          VERSION=$(node -p "require('simple-icons/package.json').version")
+          VERSION=$(pnpm view simple-icons version)
+          echo "version=$VERSION"
           echo "version=$VERSION" >> $GITHUB_OUTPUT
 
       - name: Run build
