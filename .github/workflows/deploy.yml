@@ -105,5 +105,7 @@ jobs:
           tag_name: v${{ steps.si_version.outputs.version }}
           name: PrimeSI v${{ steps.si_version.outputs.version }}
           generate_release_notes: false
+          files: |
+            out/*
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}      
