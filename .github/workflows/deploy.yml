@@ -36,6 +36,20 @@ jobs:
           echo "version=$VERSION"
           echo "version=$VERSION" >> $GITHUB_OUTPUT
 
+      - name: Check if tag exists
+        id: check_tag
+        run: |
+          VERSION=${{ steps.si_version.outputs.version }}
+          if git ls-remote --tags origin "refs/tags/v$VERSION" | grep -q v$VERSION; then
+            echo "exists=true" >> $GITHUB_OUTPUT
+          else
+            echo "exists=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Exit if release already exists
+        if: steps.check_tag.outputs.exists == 'true'
+        run: exit 0
+
       - name: Run build
         run: pnpm run go
 
@@ -80,3 +94,13 @@ jobs:
           rsync -avz -e "ssh -i key.pem -o StrictHostKeyChecking=no" \
             staging/ \
             "$DEPLOY_USER@$DEPLOY_HOST:$TARGET_PATH"
+
+      - name: Create GitHub Release
+        if: steps.check_tag.outputs.exists == 'false'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ steps.si_version.outputs.version }}
+          name: PrimeSI v${{ steps.si_version.outputs.version }}
+          generate_release_notes: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}      
