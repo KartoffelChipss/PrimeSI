@@ -51,15 +51,20 @@ jobs:
 
       - name: Exit if release already exists
         if: steps.check_tag.outputs.exists == 'true'
-        run: exit 0
+        run: |
+          echo "Release alread exists. Exiting..."
+          exit 0
 
       - name: Run build
+        if: steps.check_tag.outputs.exists == 'false'
         run: pnpm run go
 
       - name: Verify artifact exists
+        if: steps.check_tag.outputs.exists == 'false'
         run: ls -lah out/
 
       - name: Prepare Maven artifact layout
+        if: steps.check_tag.outputs.exists == 'false'
         run: |
           VERSION=${{ steps.si_version.outputs.version }}
 
@@ -78,6 +83,7 @@ jobs:
           EOF
 
       - name: Deploy to Maven repository (Nginx)
+        if: steps.check_tag.outputs.exists == 'false'
         env:
           VERSION: ${{ steps.si_version.outputs.version }}
           DEPLOY_SSH_KEY: ${{ secrets.MAVEN_SSH_KEY }}
