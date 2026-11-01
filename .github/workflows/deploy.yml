@@ -51,9 +51,7 @@ jobs:
 
       - name: Exit if release already exists
         if: steps.check_tag.outputs.exists == 'true'
-        run: |
-          echo "Release alread exists. Exiting..."
-          exit 0
+        run: echo "Release already exists. Skipping build and deploy."
 
       - name: Run build
         if: steps.check_tag.outputs.exists == 'false'
@@ -63,17 +61,11 @@ jobs:
         if: steps.check_tag.outputs.exists == 'false'
         run: ls -lah out/
 
-      - name: Prepare Maven artifact layout
+      - name: Generate POM
         if: steps.check_tag.outputs.exists == 'false'
         run: |
           VERSION=${{ steps.si_version.outputs.version }}
-
-          mkdir -p staging/org/strassburger/primesi/$VERSION
-
-          cp out/primesi.jar \
-            staging/org/strassburger/primesi/$VERSION/primesi-$VERSION.jar
-
-          cat > staging/org/strassburger/primesi/$VERSION/primesi-$VERSION.pom <<EOF
+          cat > primesi-$VERSION.pom <<EOF
           <project xmlns="http://maven.apache.org/POM/4.0.0">
             <modelVersion>4.0.0</modelVersion>
             <groupId>org.strassburger</groupId>
@@ -82,27 +74,31 @@ jobs:
           </project>
           EOF
 
-      - name: Deploy to Maven repository (Nginx)
+      - name: Deploy to simplemavenrepo
         if: steps.check_tag.outputs.exists == 'false'
         env:
           VERSION: ${{ steps.si_version.outputs.version }}
-          DEPLOY_SSH_KEY: ${{ secrets.MAVEN_SSH_KEY }}
-          DEPLOY_HOST: ${{ secrets.MAVEN_HOST }}
-          DEPLOY_USER: ${{ secrets.MAVEN_USER }}
-          TARGET_PATH: ${{ secrets.MAVEN_PATH }}
+          MAVEN_DEPLOY_TOKEN: ${{ secrets.MAVEN_DEPLOY_TOKEN }}
         run: |
-          echo "$DEPLOY_SSH_KEY" > key.pem
-          chmod 600 key.pem
-          
-          if ssh -i key.pem $DEPLOY_USER@$DEPLOY_HOST \
-            "[ -d $TARGET_PATH/org/strassburger/primesi/$VERSION ]"; then
-            echo "Version already exists, skipping deploy"
-            exit 0
-          fi
+          BASE="${{ vars.MAVEN_REPO_URL }}/org/strassburger/primesi/$VERSION"
 
-          rsync -avz -e "ssh -i key.pem -o StrictHostKeyChecking=no" \
-            staging/ \
-            "$DEPLOY_USER@$DEPLOY_HOST:$TARGET_PATH"
+          upload() {
+            local file="$1" name="$2"
+            local status
+            status=$(curl -sS -o response.txt -w '%{http_code}' \
+              -X PUT \
+              -H "Authorization: Bearer $MAVEN_DEPLOY_TOKEN" \
+              --data-binary "@$file" \
+              "$BASE/$name")
+            case "$status" in
+              201) echo "Uploaded $name" ;;
+              409) echo "$name already published, skipping" ;;
+              *)   echo "Upload of $name failed with HTTP $status:"; cat response.txt; exit 1 ;;
+            esac
+          }
+
+          upload "primesi-$VERSION.pom" "primesi-$VERSION.pom"
+          upload "out/primesi.jar"      "primesi-$VERSION.jar"
 
       - name: Create GitHub Release
         if: steps.check_tag.outputs.exists == 'false'
@@ -114,4 +110,4 @@ jobs:
           files: |
             out/*
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}      
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
