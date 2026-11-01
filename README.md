@@ -14,7 +14,7 @@ You can add PrimeSI to your project via Maven:
 <repositories>
     <repository>
         <id>strassburger-repo</id>
-        <url>https://maven.strassburger.org</url>
+        <url>https://maven.strassburger.org/releases</url>
     </repository>
 </repositories>
 
